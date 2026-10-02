@@ -1,0 +1,20 @@
+[
+  {
+    "productoId": 1,
+    "precio": 3.4,
+    "stock": 120,
+    "actualizado": "2026-10-01T09:00:00"
+  },
+  {
+    "productoId": 2,
+    "precio": 3.2,
+    "stock": 95,
+    "actualizado": "2026-10-01T09:00:00"
+  },
+  {
+    "productoId": 3,
+    "precio": 4.1,
+    "stock": 70,
+    "actualizado": "2026-10-01T09:00:00"
+  }
+]

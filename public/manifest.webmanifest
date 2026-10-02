@@ -1,0 +1,19 @@
+{
+  "name": "Backus Ventas - Caso Académico",
+  "short_name": "Backus Ventas",
+  "description": "Catálogo académico de ventas con consulta offline.",
+  "lang": "es-PE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f5",
+  "theme_color": "#073f83",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

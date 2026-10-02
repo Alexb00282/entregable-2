@@ -1,27 +1,47 @@
-# Villa001
+# Backus Ventas: caso académico PWA
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.3.2.
+Aplicación ilustrativa de catálogo para el taller de Runtime Caching. Los nombres, precios, rutas y datos son ficticios; no representan sistemas comerciales reales de Backus.
 
-## Development server
+El workspace usa Angular 19.2.25. El Service Worker integrado de Angular se genera para producción y se registra desde `src/app/app.config.ts`.
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+## Desarrollo
 
-## Code scaffolding
+```powershell
+npm start
+```
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+Abre `http://localhost:4200/`. Para compartir el servidor en la red local:
 
-## Build
+```powershell
+npm run start:host
+```
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+En desarrollo, Angular no registra el Service Worker. La prueba offline debe hacerse con el build de producción.
 
-## Running unit tests
+## Runtime Caching
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+Las reglas están en `ngsw-config.json`:
 
-## Running end-to-end tests
+- `/data/catalogo.json`: `performance`, hasta 20 respuestas durante 1 día.
+- `/data/precios.json`: `freshness`, espera la red hasta 3 segundos y conserva hasta 20 respuestas durante 1 hora.
+- Imágenes y fuentes locales: `performance`, hasta 60 recursos durante 30 días.
+- Los recursos de la aplicación se precargan como app shell.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+El catálogo se consume mediante `HttpClient`. Precios y stock se consultan por separado para no tratarlos como contenido estático. Runtime Caching GET no pone en cola pedidos POST; eso requiere una solución adicional con IndexedDB y sincronización.
 
-## Further help
+## Build y prueba offline
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+```powershell
+npm run build
+npx http-server ./dist/villa001/browser -p 8080
+```
+
+Abre `http://localhost:8080/`, carga el catálogo con conexión y verifica `ngsw-worker.js` en DevTools → Application → Service Workers. Comprueba los recursos en Cache Storage, activa Offline en Network y recarga. El catálogo debería servirse desde caché; precios/stock intentan usar la red y recurren a su respuesta guardada tras el timeout.
+
+El Service Worker requiere HTTPS, excepto en `localhost`. El servidor de desarrollo del CLI no sirve para validar el comportamiento offline de producción.
+
+## Pruebas
+
+```powershell
+npm test -- --watch=false --browsers=ChromeHeadless
+```
