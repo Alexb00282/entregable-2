@@ -4,6 +4,7 @@
       <span class="brand-symbol" aria-hidden="true">BV</span>
       <span>Backus <strong>Ventas</strong></span>
     </a>
+
     <div class="header-tools">
       <span class="network-state" [class.is-offline]="!enLinea" role="status">
         <span class="network-dot"></span>
@@ -21,8 +22,30 @@
         <p class="eyebrow">CASO ACADÉMICO · DATOS FICTICIOS</p>
         <h1 id="page-title">Catálogo de ventas</h1>
         <p>El portafolio para tu próxima visita, incluso con cobertura irregular.</p>
+        <div class="hero-actions">
+          <button type="button" class="primary-button" (click)="recargar()">Actualizar catálogo</button>
+          <span class="hero-caption">Disponible online y offline</span>
+        </div>
       </div>
-      <div class="hero-stamp" aria-hidden="true"><span>VENTAS</span><strong>EN CAMPO</strong></div>
+      <div class="hero-stamp" aria-hidden="true">
+        <span>VENTAS</span>
+        <strong>EN CAMPO</strong>
+      </div>
+    </section>
+
+    <section class="stats-bar" aria-label="Indicadores de la operación">
+      <article class="stat-card">
+        <span>Productos</span>
+        <strong>{{ productos.length }}</strong>
+      </article>
+      <article class="stat-card">
+        <span>Stock total</span>
+        <strong>{{ stockTotal }} uds.</strong>
+      </article>
+      <article class="stat-card">
+        <span>Estado</span>
+        <strong>{{ enLinea ? 'Operativo' : 'Offline' }}</strong>
+      </article>
     </section>
 
     <section class="catalog" aria-labelledby="catalog-heading">
@@ -34,10 +57,51 @@
         <span class="result-count">{{ productosFiltrados.length }} productos</span>
       </div>
 
+      <article class="product-manager" aria-label="Agregar y quitar productos">
+        <div class="manager-header">
+          <p class="eyebrow eyebrow--dark">GESTIÓN</p>
+          <h3>Agregar producto</h3>
+        </div>
+
+        <div class="manager-grid">
+          <label class="field">
+            <span>Nombre</span>
+            <input type="text" [(ngModel)]="nuevoProducto.nombre" placeholder="Ej. Cristal 1L" />
+          </label>
+
+          <label class="field">
+            <span>Categoría</span>
+            <input type="text" [(ngModel)]="nuevoProducto.categoria" placeholder="Ej. Cerveza" />
+          </label>
+
+          <label class="field">
+            <span>Precio (S/)</span>
+            <input type="number" min="0" step="0.01" [(ngModel)]="nuevoProducto.precio" />
+          </label>
+
+          <label class="field">
+            <span>Stock</span>
+            <input type="number" min="0" step="1" [(ngModel)]="nuevoProducto.stock" />
+          </label>
+        </div>
+
+        <div class="panel-actions">
+          <button type="button" class="primary-button" (click)="agregarProducto()">Agregar al catálogo</button>
+        </div>
+      </article>
+
       <label class="search-field">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></svg>
         <input type="search" placeholder="Buscar producto o categoría" [value]="terminoBusqueda" (input)="actualizarBusqueda($event)" aria-label="Buscar producto o categoría">
       </label>
+
+      <section class="cart-summary" aria-label="Resumen del carrito">
+        <div>
+          <p class="eyebrow eyebrow--dark">CARRITO</p>
+          <h3>{{ cartItems.length }} artículo(s)</h3>
+        </div>
+        <strong>S/ {{ totalCarrito | number:'1.2-2' }}</strong>
+      </section>
 
       @if (cargandoCatalogo) {
         <div class="empty-state" role="status">Cargando catálogo…</div>
@@ -61,6 +125,7 @@
                   <span class="product-id">SKU {{ producto.id.toString().padStart(4, '0') }}</span>
                 </div>
               </div>
+
               <div class="product-facts">
                 <div class="fact">
                   <span>Precio unitario</span>
@@ -70,11 +135,84 @@
                   <span>Stock disponible</span>
                   <strong>{{ obtenerPrecio(producto).stock }} <small>unid.</small></strong>
                 </div>
+                <button type="button" class="secondary-button" (click)="agregarAlCarrito(producto.id)">Agregar</button>
+                <button type="button" class="remove-button" (click)="quitarProducto(producto.id)" [attr.aria-label]="'Quitar producto ' + producto.nombre">
+                  Quitar
+                </button>
               </div>
             </article>
           }
         </div>
       }
+
+      <div class="sales-workspace">
+        <section class="cart-panel" aria-label="Carrito del vendedor">
+          <div class="panel-header cart-header">
+            <div>
+              <p class="eyebrow eyebrow--dark">CARRITO</p>
+              <h3>Productos reservados</h3>
+            </div>
+            <span class="result-count">{{ cartItems.length }} en lista</span>
+          </div>
+
+          @if (cartItems.length === 0) {
+            <div class="empty-state">Tu carrito está vacío. Agrega productos para reservar stock.</div>
+          } @else {
+            <div class="cart-list">
+              @for (item of cartItems; track item.productoId) {
+                <div class="cart-item">
+                  <div>
+                    <strong>{{ item.nombre }}</strong>
+                    <span>{{ item.categoria }} · {{ item.cantidad }} und.</span>
+                  </div>
+                  <div class="cart-item-actions">
+                    <span>S/ {{ (item.precio * item.cantidad) | number:'1.2-2' }}</span>
+                    <button type="button" class="secondary-button compact" (click)="quitarDelCarrito(item.productoId)" [attr.aria-label]="'Quitar una unidad de ' + item.nombre">-</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="cart-footer">
+            <strong>Total del carrito: S/ {{ totalCarrito | number:'1.2-2' }}</strong>
+            <button type="button" class="primary-button" (click)="confirmarCompra()" [disabled]="cartItems.length === 0">
+              Confirmar compra
+            </button>
+          </div>
+        </section>
+
+        <section class="sales-panel" aria-label="Historial de ventas">
+          <div class="panel-header cart-header">
+            <div>
+              <p class="eyebrow eyebrow--dark">VENTAS</p>
+              <h3>Historial</h3>
+            </div>
+            <span class="result-count">{{ ventas.length }} ventas</span>
+          </div>
+
+          @if (ventas.length === 0) {
+            <div class="empty-state">Todavía no hay ventas confirmadas.</div>
+          } @else {
+            <div class="sales-list">
+              @for (venta of ventas; track venta.id) {
+                <div class="sale-item">
+                  <div>
+                    <strong>{{ venta.nombre }}</strong>
+                    <span>{{ venta.cantidad }} und. · {{ venta.fecha | date:'dd/MM/yyyy HH:mm' }}</span>
+                  </div>
+                  <span class="sale-total">S/ {{ venta.total | number:'1.2-2' }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <div class="sales-total">
+            <span>Total vendido</span>
+            <strong>S/ {{ totalVentas | number:'1.2-2' }}</strong>
+          </div>
+        </section>
+      </div>
 
       <footer class="data-note">
         <span class="note-icon" aria-hidden="true">i</span>
@@ -89,6 +227,99 @@
         </p>
         <span class="academic-label">EJEMPLO ILUSTRATIVO</span>
       </footer>
+    </section>
+
+    <section class="operations" aria-label="Operaciones de ventas y gestión offline">
+      <article class="panel">
+        <div class="panel-header">
+          <p class="eyebrow eyebrow--dark">MENSAJE DEL VENDEDOR</p>
+          <h3>Registrar mensaje</h3>
+        </div>
+
+        <label class="field">
+          <span>Mensaje</span>
+          <textarea [(ngModel)]="mensaje" rows="4" placeholder="Ej. Requiere entrega urgente en Trujillo..."></textarea>
+        </label>
+
+        <div class="panel-actions">
+          <button type="button" class="primary-button" (click)="guardarMensaje()" [disabled]="!mensaje.trim()">
+            {{ enLinea ? 'Enviar mensaje' : 'Guardar localmente' }}
+          </button>
+        </div>
+
+        @if (mensajeGuardado) {
+          <p class="status-message" role="status">{{ mensajeGuardado }}</p>
+        }
+
+        @if (mensajesPendientes.length > 0) {
+          <div class="list-box">
+            <h4>Mensajes pendientes</h4>
+            <ul>
+              @for (item of mensajesPendientes; track item.id) {
+                <li>
+                  <span>{{ item.texto }}</span>
+                  <small>{{ item.fecha | date:'dd/MM/yyyy HH:mm' }}</small>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <p class="eyebrow eyebrow--dark">PEDIDO</p>
+          <h3>Registrar pedido</h3>
+        </div>
+
+        <div class="order-grid">
+          <label class="field">
+            <span>Producto</span>
+            <select [(ngModel)]="productoPedido">
+              @for (producto of productos; track producto.id) {
+                <option [ngValue]="producto.id">{{ producto.nombre }}</option>
+              }
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Cantidad</span>
+            <input type="number" min="1" [max]="stockDisponiblePedido" [ngModel]="cantidadPedido" (ngModelChange)="validarCantidadPedido($event)" />
+          </label>
+        </div>
+
+        @if (productoSeleccionado) {
+          <p class="stock-info">Stock disponible: {{ stockDisponiblePedido }} unidades.</p>
+        }
+
+        <label class="field">
+          <span>Observaciones</span>
+          <textarea [(ngModel)]="observacionPedido" rows="3" placeholder="Ej. Entrega en horario de 9:00 a 12:00"></textarea>
+        </label>
+
+        <div class="panel-actions">
+          <button type="button" class="primary-button" (click)="guardarPedido()" [disabled]="productos.length === 0 || cantidadPedido < 1 || cantidadPedido > stockDisponiblePedido">
+            {{ enLinea ? 'Procesar pedido' : 'Guardar pedido offline' }}
+          </button>
+        </div>
+
+        @if (pedidosPendientes.length > 0) {
+          <div class="list-box">
+            <h4>Pedidos pendientes</h4>
+            <ul>
+              @for (pedido of pedidosPendientes; track pedido.id) {
+                <li>
+                  <div>
+                    <strong>{{ pedido.producto }}</strong>
+                    <span>{{ pedido.cantidad }} und. · S/ {{ pedido.total | number:'1.2-2' }}</span>
+                  </div>
+                  <small>{{ pedido.fecha | date:'dd/MM/yyyy HH:mm' }}</small>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </article>
     </section>
   </main>
 
