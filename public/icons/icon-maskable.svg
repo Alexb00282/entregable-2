@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo a sangre y símbolo centrado dentro de la zona segura de iconos maskable. -->
+  <rect width="512" height="512" fill="#e3502e"/>
+  <path d="M128 235h256v34H128zm25-51h206c-10-41-48-69-103-69s-93 28-103 69zm-25 108h256c-10 41-48 69-103 69h-50c-55 0-93-28-103-69z" fill="#fffaf5"/>
+  <path d="M150 291h212" fill="none" stroke="#ffca68" stroke-linecap="round" stroke-width="15"/>
+</svg>

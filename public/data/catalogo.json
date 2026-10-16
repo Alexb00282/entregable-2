@@ -1,23 +1,74 @@
 [
   {
     "id": 1,
-    "nombre": "Cristal 620 ml",
-    "categoria": "Cerveza",
-    "precio": 3.4,
-    "stock": 120
+    "nombre": "Hamburguesa clásica",
+    "categoria": "Hamburguesas",
+    "precio": 18.9,
+    "stock": 30,
+    "descripcion": "Carne a la parrilla, queso cheddar y salsa de la casa.",
+    "emoji": "🍔"
   },
   {
     "id": 2,
-    "nombre": "Pilsen Callao 620 ml",
-    "categoria": "Cerveza",
-    "precio": 3.2,
-    "stock": 95
+    "nombre": "Doble cheeseburger",
+    "categoria": "Hamburguesas",
+    "precio": 24.5,
+    "stock": 24,
+    "descripcion": "Doble carne, doble cheddar, pepinillos y cebolla.",
+    "emoji": "🍔"
   },
   {
     "id": 3,
-    "nombre": "Cusqueña 620 ml",
-    "categoria": "Cerveza",
-    "precio": 4.1,
-    "stock": 70
+    "nombre": "Pizza margarita",
+    "categoria": "Pizzas",
+    "precio": 27,
+    "stock": 16,
+    "descripcion": "Mozzarella, tomate fresco, albahaca y aceite de oliva.",
+    "emoji": "🍕"
+  },
+  {
+    "id": 4,
+    "nombre": "Pizza pepperoni",
+    "categoria": "Pizzas",
+    "precio": 31.5,
+    "stock": 18,
+    "descripcion": "Pepperoni, mozzarella y salsa de tomate artesanal.",
+    "emoji": "🍕"
+  },
+  {
+    "id": 5,
+    "nombre": "Papas crocantes",
+    "categoria": "Acompañamientos",
+    "precio": 9.5,
+    "stock": 40,
+    "descripcion": "Papas doradas con sal de romero.",
+    "emoji": "🍟"
+  },
+  {
+    "id": 6,
+    "nombre": "Nuggets de pollo",
+    "categoria": "Acompañamientos",
+    "precio": 12,
+    "stock": 35,
+    "descripcion": "Seis piezas de pollo crocante con salsa BBQ.",
+    "emoji": "🍗"
+  },
+  {
+    "id": 7,
+    "nombre": "Limonada de la casa",
+    "categoria": "Bebidas",
+    "precio": 7,
+    "stock": 50,
+    "descripcion": "Limón recién exprimido, hierbabuena y hielo.",
+    "emoji": "🍋"
+  },
+  {
+    "id": 8,
+    "nombre": "Brownie tibio",
+    "categoria": "Postres",
+    "precio": 8.5,
+    "stock": 20,
+    "descripcion": "Brownie de chocolate servido con fudge.",
+    "emoji": "🍫"
   }
 ]

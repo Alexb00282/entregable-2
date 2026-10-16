@@ -30,48 +30,27 @@
   ],
   "dataGroups": [
     {
-      "name": "catalogo-backus",
+      "name": "menu-fastorder",
       "urls": [
         "/data/catalogo.json"
-      ],
-      "cacheConfig": {
-        "strategy": "performance",
-        "maxSize": 20,
-        "maxAge": "1d"
-      }
-    },
-    {
-      "name": "precios-backus",
-      "urls": [
-        "/data/precios.json"
       ],
       "cacheConfig": {
         "strategy": "freshness",
         "timeout": "3s",
         "maxSize": 20,
-        "maxAge": "1h"
-      }
-    },
-    {
-      "name": "imagenes-backus",
-      "urls": [
-        "/assets/images/**"
-      ],
-      "cacheConfig": {
-        "strategy": "performance",
-        "maxSize": 60,
         "maxAge": "30d"
       }
     },
     {
-      "name": "fuentes-backus",
+      "name": "estado-pedidos-fastorder",
       "urls": [
-        "/assets/fonts/**"
+        "/api/orders/**"
       ],
       "cacheConfig": {
-        "strategy": "performance",
-        "maxSize": 60,
-        "maxAge": "30d"
+        "strategy": "freshness",
+        "timeout": "3s",
+        "maxSize": 20,
+        "maxAge": "5m"
       }
     }
   ]

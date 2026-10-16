@@ -1,87 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+/* Estilos base compartidos por la app: tipografía, colores y fondo. */
+:root {
+  color-scheme: light;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  background: #fffaf5;
+  color: #332b24;
+}
 
-:root { color-scheme: light; font-family: 'DM Sans', 'Segoe UI', sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; background: #f4f6f5; color: #18364c; }
+/* Normaliza tamaños y márgenes para mantener el layout predecible. */
 * { box-sizing: border-box; }
 body { min-width: 320px; min-height: 100vh; margin: 0; }
 button, input { font: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid rgba(27, 112, 157, .38); outline-offset: 2px; }
-.app-shell { min-height: 100vh; background: #f4f6f5; }
-.site-header { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 clamp(20px, 5vw, 76px); background: #fff; border-bottom: 1px solid #e4e9e7; }
-.brand, .header-tools, .network-state, .icon-action, .product-info, .product-facts, .catalog-heading, .data-note { display: flex; align-items: center; }
-.brand { gap: 11px; color: #133c68; text-decoration: none; font-size: 17px; font-weight: 500; }
-.brand strong { font-weight: 750; }
-.brand-symbol { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; background: #064e9a; color: #fff; font-size: 12px; font-weight: 800; }
-.header-tools { gap: 22px; }
-.network-state { gap: 8px; color: #286c4d; font-size: 13px; font-weight: 650; }
-.network-dot { width: 8px; height: 8px; border-radius: 50%; background: #2c9a65; box-shadow: 0 0 0 3px #e3f3e9; }
-.network-state.is-offline { color: #a54936; }
-.network-state.is-offline .network-dot { background: #d2644c; box-shadow: 0 0 0 3px #f9e9e4; }
-.icon-action { width: 40px; height: 40px; justify-content: center; border: 1px solid #dce4e2; border-radius: 5px; background: #fff; color: #244766; cursor: pointer; }
-.icon-action:hover:not(:disabled) { border-color: #7fa4c2; background: #f6faff; }
-.icon-action:disabled { opacity: .55; cursor: wait; }
-.icon-action svg, .search-field svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.page-content { width: min(100% - 40px, 1120px); margin: 0 auto; padding: 48px 0 72px; }
-.hero { min-height: 198px; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 32px clamp(24px, 5vw, 62px); overflow: hidden; border-radius: 7px; color: #fff; background-color: #07498c; background-image: linear-gradient(105deg, rgba(5, 50, 99, .98), rgba(9, 91, 155, .91) 54%, rgba(16, 119, 150, .84)), repeating-linear-gradient(135deg, transparent 0 25px, rgba(255, 255, 255, .04) 25px 26px); }
-.eyebrow { margin: 0 0 10px; color: #78b7cf; font-size: 10px; font-weight: 800; line-height: 1.3; }
-.hero h1 { margin: 0; font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; font-size: 44px; font-weight: 700; line-height: 1.04; }
-.hero-copy > p:last-child { margin: 12px 0 0; color: #d9e9f0; font-size: 15px; }
-.hero-stamp { width: 112px; height: 112px; flex: 0 0 112px; display: flex; flex-direction: column; justify-content: center; padding-left: 17px; border: 1px solid rgba(255, 255, 255, .33); border-radius: 50%; color: #e0f5ea; transform: rotate(-10deg); }
-.hero-stamp span { font-size: 10px; font-weight: 700; }
-.hero-stamp strong { font-size: 13px; font-weight: 800; }
-.catalog { margin-top: 35px; }
-.catalog-heading { justify-content: space-between; margin-bottom: 17px; }
-.eyebrow--dark { margin-bottom: 5px; color: #66837e; }
-.catalog-heading h2 { margin: 0; color: #17364e; font-size: 23px; font-weight: 750; }
-.result-count { padding: 6px 10px; border-radius: 4px; background: #e5eeeb; color: #456b64; font-size: 12px; font-weight: 700; }
-.search-field { height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 13px; border: 1px solid #dce4e1; border-radius: 5px; background: #fff; color: #67807b; }
-.search-field:focus-within { border-color: #4386ad; box-shadow: 0 0 0 3px rgba(67, 134, 173, .12); }
-.search-field input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #18364c; font-size: 13px; }
-.search-field input::placeholder { color: #93a29f; }
-.product-list { margin-top: 14px; border: 1px solid #e1e7e4; border-radius: 6px; background: #fff; }
-.product-row { min-height: 112px; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 17px 23px; border-bottom: 1px solid #edf0ee; }
-.product-row:last-child { border-bottom: 0; }
-.product-info { min-width: 0; gap: 16px; }
-.product-visual { width: 58px; height: 70px; flex: 0 0 58px; display: grid; place-items: center; border-radius: 5px; background: linear-gradient(145deg, #e8f1ed, #d7e8e1); color: #3e7768; font-family: Georgia, serif; font-size: 23px; font-weight: 700; }
-.product-visual[data-product-id="2"] { background: linear-gradient(145deg, #e9eef2, #dbe4eb); color: #355c7a; }
-.product-visual[data-product-id="3"] { background: linear-gradient(145deg, #f6efd9, #ebdfbb); color: #896b2b; }
-.product-title { min-width: 0; }
-.product-category, .product-id, .fact > span { display: block; color: #81918d; font-size: 11px; line-height: 1.4; }
-.product-category { margin-bottom: 3px; color: #568072; font-weight: 650; }
-.product-title h3 { margin: 0 0 5px; overflow-wrap: anywhere; color: #1b3548; font-size: 15px; font-weight: 700; }
-.product-facts { flex: 0 0 auto; gap: clamp(22px, 5vw, 70px); }
-.fact { min-width: 95px; }
-.fact > span { margin-bottom: 5px; }
-.fact strong { color: #1b634f; font-size: 16px; font-weight: 750; white-space: nowrap; }
-.fact:last-child strong { color: #1e3e54; }
-.fact small { color: #7d9089; font-size: 11px; font-weight: 500; }
-.empty-state { margin-top: 14px; padding: 20px; border: 1px solid #e1e7e4; border-radius: 5px; background: #fff; color: #526b69; font-size: 14px; }
-.empty-state--error { display: grid; gap: 6px; border-color: #eed3cc; color: #854839; }
-.empty-state--error span { font-size: 13px; }
-.retry-button { width: fit-content; margin-top: 8px; padding: 8px 11px; border: 1px solid #bbd0c9; border-radius: 4px; background: #fff; color: #245d4b; font-size: 12px; font-weight: 700; cursor: pointer; }
-.data-note { min-height: 60px; gap: 10px; margin-top: 14px; padding: 11px 14px; border-radius: 5px; background: #e9efeb; color: #536e65; }
-.note-icon { width: 18px; height: 18px; flex: 0 0 18px; display: grid; place-items: center; border: 1px solid #79968b; border-radius: 50%; font-family: Georgia, serif; font-size: 12px; font-style: italic; }
-.data-note p { flex: 1; margin: 0; font-size: 11px; line-height: 1.45; }
-.academic-label { flex: 0 0 auto; color: #728980; font-size: 9px; font-weight: 800; }
-.offline-notice { position: fixed; right: 20px; bottom: 20px; z-index: 2; max-width: calc(100vw - 40px); padding: 12px 16px; border: 1px solid #edc5b9; border-radius: 5px; background: #fff4ef; color: #8a4836; font-size: 12px; box-shadow: 0 8px 28px rgba(36, 49, 43, .12); opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .18s ease, transform .18s ease; }
-.offline-notice--show { opacity: 1; transform: translateY(0); }
 
-@media (max-width: 620px) {
-	.site-header { min-height: 66px; padding-inline: 16px; }
-	.brand { font-size: 15px; }
-	.header-tools { gap: 12px; }
-	.page-content { width: min(100% - 28px, 1120px); padding-top: 25px; }
-	.hero { min-height: 168px; padding: 24px 21px; }
-	.hero h1 { font-size: 36px; }
-	.hero-stamp { width: 74px; height: 74px; flex-basis: 74px; padding-left: 11px; }
-	.hero-stamp span { font-size: 8px; }
-	.hero-stamp strong { font-size: 9px; }
-	.hero-copy > p:last-child { max-width: 230px; font-size: 13px; line-height: 1.45; }
-	.product-row { align-items: flex-start; flex-direction: column; gap: 14px; padding: 16px; }
-	.product-facts { width: 100%; justify-content: flex-end; gap: 28px; padding-left: 74px; }
-	.fact { min-width: 82px; }
-	.academic-label { display: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-	*, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+/* Indicador visible para navegar con teclado y tecnologías asistivas. */
+button:focus-visible, a:focus-visible, input:focus-visible {
+  outline: 3px solid #e3502e66;
+  outline-offset: 3px;
 }

@@ -1,8 +1,18 @@
 import { CommonModule } from '@angular/common';
+import { Component, HostListener, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Component, HostListener, OnInit } from '@angular/core';
-import { CatalogoService, Precio, Producto } from './services/catalogo.service';
-import { CarritoItem, MensajeGuardado, PedidoGuardado, StorageService, VentaGuardada } from './services/storage.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Subscription, timer } from 'rxjs';
+import { CatalogoService, Producto } from './services/catalogo.service';
+import { OrderSyncService } from './services/order-sync.service';
+import { CarritoItem, EstadoPedido, PedidoGuardado, StorageService } from './services/storage.service';
+import { PushService } from './services/push.service';
+
+// El navegador aún no tipa este evento en todas las versiones de TypeScript.
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
 
 @Component({
   selector: 'app-root',
@@ -10,46 +20,70 @@ import { CarritoItem, MensajeGuardado, PedidoGuardado, StorageService, VentaGuar
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })
-export class AppComponent implements OnInit {
-  readonly title = 'Backus Ventas';
+export class AppComponent implements OnInit, OnDestroy {
+  // Datos de presentación que consume la plantilla.
+  readonly title = 'FastOrder';
+  readonly pasosPedido = [
+    { estado: 'recibido' as const, etiqueta: 'Recibido' },
+    { estado: 'preparacion' as const, etiqueta: 'En preparación' },
+    { estado: 'listo' as const, etiqueta: 'Listo' }
+  ];
+  private readonly catalogoService = inject(CatalogoService);
+  private readonly orderSyncService = inject(OrderSyncService);
+  private readonly storageService = inject(StorageService);
+  private readonly pushService = inject(PushService);
+  // Una sola suscripción agrupa los listeners RxJS para liberarlos al cerrar la vista.
+  private readonly subscriptions = new Subscription();
+  private installPrompt?: BeforeInstallPromptEvent;
+
+  // Estado visible: datos, filtros, carrito, sincronización e instalación.
   productos: Producto[] = [];
-  precios: Precio[] = [];
+  pedidos: PedidoGuardado[] = [];
+  cartItems: CarritoItem[] = [];
   terminoBusqueda = '';
+  categoriaSeleccionada = 'Todos';
   enLinea = typeof navigator === 'undefined' || navigator.onLine;
   cargandoCatalogo = true;
-  errorCatalogo = false;
-  errorPrecios = false;
+  errorCatalogo = '';
   mensaje = '';
-  mensajeGuardado = '';
-  productoPedido = 1;
-  cantidadPedido = 1;
-  observacionPedido = '';
-  pedidosPendientes: PedidoGuardado[] = [];
-  mensajesPendientes: MensajeGuardado[] = [];
-  cartItems: CarritoItem[] = [];
-  ventas: VentaGuardada[] = [];
-  private productosBase: Producto[] = [];
-  nuevoProducto = {
-    nombre: '',
-    categoria: 'Cerveza',
-    precio: 0,
-    stock: 0
-  };
-
-  constructor(
-    private readonly catalogoService: CatalogoService,
-    private readonly storageService: StorageService
-  ) {}
+  cartOpen = false;
+  sincronizando = false;
+  instalable = false;
+  pushDisponible = false;
+  activandoAvisos = false;
 
   ngOnInit(): void {
-    this.cargarDatos();
+    // Carga inicial local/remota y escucha errores de revalidación del menú.
+    this.cargarCatalogo();
     void this.cargarPersistencia();
+    this.subscriptions.add(this.catalogoService.revalidationErrors$.subscribe((error) => {
+      this.mensaje = `Mostrando el menú guardado; no se pudo actualizar: ${this.errorComoTexto(error)}`;
+    }));
+    // Mientras la vista esté abierta, consulta al servidor los pedidos activos.
+    this.subscriptions.add(timer(0, 15000).subscribe(() => void this.actualizarEstadosPedidos()));
+    if (this.enLinea) {
+      void this.sincronizarPedidos();
+    }
+    this.pushDisponible = this.pushService.disponible;
+    if (this.pushDisponible) {
+      this.subscriptions.add(this.pushService.messages$.subscribe((payload) => {
+        this.mensaje = this.pushService.mensajeDe(payload);
+        void this.aplicarActualizacionPush(payload);
+      }));
+    }
   }
 
+  ngOnDestroy(): void {
+    // Evita dejar el polling y el listener de push vivos tras destruir el componente.
+    this.subscriptions.unsubscribe();
+  }
+
+  // El navegador dispara estos eventos al cambiar conectividad de la pestaña.
   @HostListener('window:online')
   alConectar(): void {
     this.enLinea = true;
-    void this.cargarPersistencia();
+    void this.sincronizarPedidos();
+    void this.actualizarEstadosPedidos();
   }
 
   @HostListener('window:offline')
@@ -57,365 +91,270 @@ export class AppComponent implements OnInit {
     this.enLinea = false;
   }
 
+  // Guarda la invitación nativa de instalación hasta que la persona pulsa el botón.
+  @HostListener('window:beforeinstallprompt', ['$event'])
+  alSolicitarInstalacion(event: BeforeInstallPromptEvent): void {
+    event.preventDefault();
+    this.installPrompt = event;
+    this.instalable = true;
+  }
+
+  @HostListener('window:appinstalled')
+  alInstalar(): void {
+    this.instalable = false;
+    this.installPrompt = undefined;
+    this.mensaje = 'FastOrder se instaló correctamente.';
+  }
+
+  // Valores derivados: no se duplican como estado mutable.
+  get categorias(): string[] {
+    return ['Todos', ...new Set(this.productos.map((producto) => producto.categoria))];
+  }
+
   get productosFiltrados(): Producto[] {
     const termino = this.terminoBusqueda.trim().toLocaleLowerCase('es');
     return this.productos.filter((producto) =>
-      `${producto.nombre} ${producto.categoria}`.toLocaleLowerCase('es').includes(termino)
+      (this.categoriaSeleccionada === 'Todos' || producto.categoria === this.categoriaSeleccionada)
+      && `${producto.nombre} ${producto.descripcion}`.toLocaleLowerCase('es').includes(termino)
     );
-  }
-
-  get stockTotal(): number {
-    return this.productos.reduce((total, producto) => total + producto.stock, 0);
   }
 
   get totalCarrito(): number {
     return this.cartItems.reduce((total, item) => total + item.cantidad * item.precio, 0);
   }
 
-  get totalVentas(): number {
-    return this.ventas.reduce((total, venta) => total + venta.total, 0);
+  get unidadesCarrito(): number {
+    return this.cartItems.reduce((total, item) => total + item.cantidad, 0);
   }
 
-  get productoSeleccionado(): Producto | undefined {
-    return this.productos.find((producto) => producto.id === this.productoPedido);
+  // Actualiza la categoría activa; el getter vuelve a filtrar los platos.
+  seleccionarCategoria(categoria: string): void {
+    this.categoriaSeleccionada = categoria;
   }
 
-  get stockDisponiblePedido(): number {
-    return this.obtenerStockDisponible(this.productoPedido);
-  }
-
-  obtenerPrecio(producto: Producto): Precio {
-    return this.precios.find((precio) => precio.productoId === producto.id) ?? {
-      productoId: producto.id,
-      precio: producto.precio,
-      stock: producto.stock,
-      actualizado: ''
-    };
-  }
-
-  recargar(): void {
-    this.cargarDatos();
-  }
-
-  actualizarBusqueda(event: Event): void {
-    this.terminoBusqueda = (event.target as HTMLInputElement).value;
-  }
-
-  agregarProducto(): void {
-    const nombre = this.nuevoProducto.nombre.trim();
-    const categoria = this.nuevoProducto.categoria.trim() || 'General';
-    const precio = Number(this.nuevoProducto.precio);
-    const stock = Number(this.nuevoProducto.stock);
-
-    if (!nombre || Number.isNaN(precio) || Number.isNaN(stock) || precio < 0 || stock < 0) {
-      this.mensajeGuardado = 'Completa los datos del producto para agregarlo al catálogo.';
-      return;
-    }
-
-    const nuevoId = this.productos.reduce((max, producto) => Math.max(max, producto.id), 0) + 1;
-    const producto: Producto = {
-      id: nuevoId,
-      nombre,
-      categoria,
-      precio: Number(precio.toFixed(2)),
-      stock: Math.trunc(stock)
-    };
-
-    this.productosBase = [...this.productosBase, producto];
-    this.productos = [...this.productos, producto];
-    this.productoPedido = producto.id;
-    this.nuevoProducto = { nombre: '', categoria: 'Cerveza', precio: 0, stock: 0 };
-    this.mensajeGuardado = `Producto agregado: ${producto.nombre}.`;
-  }
-
-  quitarProducto(productoId: number): void {
-    const producto = this.productos.find((item) => item.id === productoId);
-
-    if (!producto) {
-      return;
-    }
-
-    this.productos = this.productos.filter((item) => item.id !== productoId);
-    this.productosBase = this.productosBase.filter((item) => item.id !== productoId);
-    this.cartItems = this.cartItems.filter((item) => item.productoId !== productoId);
-    this.storageService.guardarCarrito(this.cartItems);
-    this.mensajeGuardado = `Producto eliminado: ${producto.nombre}.`;
-
-    if (this.productoPedido === productoId && this.productos.length > 0) {
-      this.productoPedido = this.productos[0].id;
-    }
-  }
-
-  agregarAlCarrito(productId: number): void {
-    const productoBase = this.productosBase.find((item) => item.id === productId);
-    const productoActual = this.productos.find((item) => item.id === productId);
-    const disponible = this.obtenerStockDisponible(productId);
-
-    if (!productoBase || !productoActual || disponible <= 0) {
-      this.mensajeGuardado = 'No hay stock disponible para este producto.';
-      return;
-    }
-
-    const itemExistente = this.cartItems.find((item) => item.productoId === productId);
-    if (itemExistente && itemExistente.cantidad >= disponible) {
-      this.mensajeGuardado = `No puedes agregar más de ${disponible} unidades de ${productoBase.nombre}.`;
-      return;
-    }
-
-    if (itemExistente) {
-      itemExistente.cantidad += 1;
-      itemExistente.fecha = new Date().toISOString();
+  // Añadir un plato actualiza el carrito persistido y da feedback inmediato.
+  agregarAlCarrito(producto: Producto): void {
+    const existente = this.cartItems.find((item) => item.productoId === producto.id);
+    if (existente) {
+      existente.cantidad += 1;
     } else {
-      this.cartItems = [
-        ...this.cartItems,
-        {
-          productoId: productoBase.id,
-          nombre: productoBase.nombre,
-          categoria: productoBase.categoria,
-          precio: this.obtenerPrecio(productoBase).precio,
-          cantidad: 1,
-          fecha: new Date().toISOString()
-        }
-      ];
+      this.cartItems = [...this.cartItems, {
+        productoId: producto.id,
+        nombre: producto.nombre,
+        categoria: producto.categoria,
+        precio: producto.precio,
+        cantidad: 1,
+        fecha: new Date().toISOString()
+      }];
     }
-
-    this.storageService.guardarCarrito(this.cartItems);
-    this.actualizarStockDesdeCarrito();
-    this.mensajeGuardado = `${productoBase.nombre} agregado al carrito.`;
+    void this.guardarCarrito();
+    this.mensaje = `${producto.nombre} se agregó al carrito.`;
   }
 
-  quitarDelCarrito(productId: number): void {
-    const item = this.cartItems.find((producto) => producto.productoId === productId);
+  // Ajusta la cantidad y elimina una línea cuando llega a cero.
+  cambiarCantidad(productoId: number, incremento: number): void {
+    const item = this.cartItems.find((actual) => actual.productoId === productoId);
     if (!item) {
       return;
     }
-
-    if (item.cantidad > 1) {
-      item.cantidad -= 1;
-      item.fecha = new Date().toISOString();
-    } else {
-      this.cartItems = this.cartItems.filter((producto) => producto.productoId !== productId);
-    }
-
-    this.storageService.guardarCarrito(this.cartItems);
-    this.actualizarStockDesdeCarrito();
-    this.mensajeGuardado = `Se quitó 1 unidad del carrito.`;
+    item.cantidad += incremento;
+    this.cartItems = this.cartItems.filter((actual) => actual.cantidad > 0);
+    void this.guardarCarrito();
   }
 
-  async guardarMensaje(): Promise<void> {
-    const texto = this.mensaje.trim();
-
-    if (!texto) {
-      return;
-    }
-
-    if (this.enLinea) {
-      this.mensajeGuardado = 'Mensaje enviado para revisión inmediata.';
-      this.mensaje = '';
-      return;
-    }
-
-    await this.storageService.guardarMensaje({ texto, fecha: new Date().toISOString(), estado: 'pendiente' });
-    this.mensaje = '';
-    this.mensajeGuardado = 'Mensaje guardado localmente. Se sincronizará cuando vuelva la conexión.';
-    await this.cargarPersistencia();
-  }
-
-  validarCantidadPedido(valor: number): void {
-    const disponible = this.obtenerStockDisponible(this.productoPedido);
-    if (valor > disponible) {
-      this.cantidadPedido = disponible;
-      this.mensajeGuardado = `La cantidad máxima disponible es ${disponible} unidades.`;
-      return;
-    }
-
-    this.cantidadPedido = Math.max(1, valor || 1);
-  }
-
-  async guardarPedido(): Promise<void> {
-    const producto = this.productos.find((item) => item.id === this.productoPedido);
-
-    if (!producto) {
-      return;
-    }
-
-    const disponible = this.obtenerStockDisponible(producto.id);
-    if (this.cantidadPedido > disponible) {
-      this.mensajeGuardado = `La cantidad solicitada supera el stock disponible (${disponible} unidades).`;
-      this.cantidadPedido = disponible || 1;
+  // Primero persiste localmente; solo después intenta enviar para no perder pedidos offline.
+  async confirmarPedido(): Promise<void> {
+    if (this.cartItems.length === 0) {
+      this.mensaje = 'Agrega al menos un plato antes de confirmar el pedido.';
       return;
     }
 
     const pedido: PedidoGuardado = {
-      producto: producto.nombre,
-      cantidad: this.cantidadPedido,
-      total: Number((producto.precio * this.cantidadPedido).toFixed(2)),
-      observaciones: this.observacionPedido.trim(),
+      id: crypto.randomUUID(),
+      items: this.cartItems.map(({ productoId, nombre, cantidad, precio }) => ({ productoId, nombre, cantidad, precio })),
+      total: Number(this.totalCarrito.toFixed(2)),
       fecha: new Date().toISOString(),
       estado: 'pendiente'
     };
 
-    const productoBase = this.productosBase.find((item) => item.id === producto.id);
-    if (productoBase) {
-      productoBase.stock = Math.max(0, productoBase.stock - this.cantidadPedido);
-      this.guardarVenta({
-        productoId: productoBase.id,
-        nombre: productoBase.nombre,
-        categoria: productoBase.categoria,
-        cantidad: this.cantidadPedido,
-        total: Number((productoBase.precio * this.cantidadPedido).toFixed(2)),
-        fecha: new Date().toISOString(),
-        estado: 'confirmada'
-      });
+    try {
+      await this.storageService.guardarPedido(pedido);
+      this.cartItems = [];
+      await this.storageService.guardarCarrito(this.cartItems);
+      this.cartOpen = false;
+      await this.cargarPersistencia();
+      this.mensaje = this.enLinea
+        ? 'Pedido guardado. Intentando enviarlo al restaurante…'
+        : 'Pedido guardado en este dispositivo. Se enviará al recuperar la conexión.';
+      if (this.enLinea) {
+        await this.sincronizarPedidos();
+      }
+    } catch (error) {
+      this.mensaje = `No se pudo guardar el pedido: ${this.errorComoTexto(error)}`;
     }
-
-    this.actualizarStockDesdeCarrito();
-
-    if (this.enLinea) {
-      this.mensajeGuardado = `Pedido para ${producto.nombre} registrado y enviado para revisión.`;
-      this.productoPedido = producto.id;
-      this.cantidadPedido = 1;
-      this.observacionPedido = '';
-      return;
-    }
-
-    await this.storageService.guardarPedido(pedido);
-    this.mensajeGuardado = `Pedido guardado localmente para sincronizar cuando vuelva Internet.`;
-    this.cantidadPedido = 1;
-    this.observacionPedido = '';
-    await this.cargarPersistencia();
   }
 
-  confirmarCompra(): void {
-    if (this.cartItems.length === 0) {
-      this.mensajeGuardado = 'Tu carrito está vacío.';
+  // El evento de instalación solo puede invocarse tras una acción del usuario.
+  async instalarApp(): Promise<void> {
+    if (!this.installPrompt) {
       return;
     }
-
-    const errores: string[] = [];
-
-    for (const item of this.cartItems) {
-      const producto = this.productosBase.find((productoActual) => productoActual.id === item.productoId);
-      if (!producto) {
-        errores.push(`No existe el producto ${item.nombre}.`);
-        continue;
+    try {
+      await this.installPrompt.prompt();
+      const choice = await this.installPrompt.userChoice;
+      this.instalable = false;
+      this.installPrompt = undefined;
+      if (choice.outcome === 'accepted') {
+        this.mensaje = 'FastOrder se instaló correctamente.';
       }
-
-      const disponible = this.obtenerStockDisponible(item.productoId);
-      if (item.cantidad > disponible) {
-        errores.push(`No puedes vender ${item.cantidad} unidades de ${item.nombre}; solo quedan ${disponible}.`);
-      }
+    } catch (error) {
+      this.mensaje = `No se pudo iniciar la instalación: ${this.errorComoTexto(error)}`;
     }
-
-    if (errores.length > 0) {
-      this.mensajeGuardado = errores[0];
-      return;
-    }
-
-    for (const item of this.cartItems) {
-      const producto = this.productosBase.find((productoActual) => productoActual.id === item.productoId);
-      if (!producto) {
-        continue;
-      }
-
-      producto.stock = Math.max(0, producto.stock - item.cantidad);
-      this.guardarVenta({
-        productoId: producto.id,
-        nombre: producto.nombre,
-        categoria: producto.categoria,
-        cantidad: item.cantidad,
-        total: Number((item.precio * item.cantidad).toFixed(2)),
-        fecha: new Date().toISOString(),
-        estado: 'confirmada'
-      });
-    }
-
-    this.cartItems = [];
-    this.storageService.guardarCarrito(this.cartItems);
-    this.actualizarStockDesdeCarrito();
-    this.mensajeGuardado = 'Compra confirmada correctamente. El stock fue actualizado.';
   }
 
-  private cargarDatos(): void {
+  // Inicia suscripción push solo al pulsar el botón y comunica el resultado.
+  async activarAvisos(): Promise<void> {
+    this.activandoAvisos = true;
+    try {
+      await this.pushService.suscribir();
+      this.mensaje = 'Avisos activados para este dispositivo.';
+    } catch (error) {
+      this.mensaje = `No se pudieron activar los avisos: ${this.errorComoTexto(error)}`;
+    } finally {
+      this.activandoAvisos = false;
+    }
+  }
+
+  // Convierte el estado del backend a texto legible y mantiene los pasos monotónicos.
+  estadoLabel(estado: EstadoPedido): string {
+    const labels: Record<EstadoPedido, string> = {
+      pendiente: 'Pendiente de envío',
+      recibido: 'Recibido',
+      preparacion: 'En preparación',
+      listo: 'Listo'
+    };
+    return labels[estado];
+  }
+
+  pasoActivo(estado: EstadoPedido, paso: 'recibido' | 'preparacion' | 'listo'): boolean {
+    const orden: Exclude<EstadoPedido, 'pendiente'>[] = ['recibido', 'preparacion', 'listo'];
+    return estado !== 'pendiente' && orden.indexOf(estado) >= orden.indexOf(paso);
+  }
+
+  private cargarCatalogo(): void {
     this.cargandoCatalogo = true;
-    this.errorCatalogo = false;
-    this.errorPrecios = false;
-
-    this.catalogoService.obtenerCatalogo().subscribe({
+    this.errorCatalogo = '';
+    this.subscriptions.add(this.catalogoService.obtenerCatalogo().subscribe({
       next: (productos) => {
-        this.productosBase = productos.map((producto) => ({ ...producto }));
-        this.productos = productos.map((producto) => ({ ...producto }));
-        this.productoPedido = productos[0]?.id ?? 1;
-        this.actualizarStockDesdeCarrito();
+        this.productos = productos;
         this.cargandoCatalogo = false;
       },
-      error: () => {
-        this.errorCatalogo = true;
+      error: (error: unknown) => {
+        this.errorCatalogo = this.errorComoTexto(error);
         this.cargandoCatalogo = false;
       }
-    });
-
-    this.catalogoService.obtenerPrecios().subscribe({
-      next: (precios) => this.precios = precios,
-      error: () => this.errorPrecios = true
-    });
+    }));
   }
 
+  // Restaura en paralelo la cola de pedidos y el carrito guardado en IndexedDB.
   private async cargarPersistencia(): Promise<void> {
     try {
-      const [pedidos, mensajes] = await Promise.all([
+      const [pedidos, carrito] = await Promise.all([
         this.storageService.obtenerPedidos(),
-        this.storageService.obtenerMensajes()
+        this.storageService.obtenerCarrito()
       ]);
-
-      this.pedidosPendientes = pedidos;
-      this.mensajesPendientes = mensajes;
-      this.cartItems = this.storageService.obtenerCarrito();
-      this.ventas = this.storageService.obtenerVentas();
-      this.actualizarStockDesdeCarrito();
-    } catch {
-      this.pedidosPendientes = [];
-      this.mensajesPendientes = [];
-      this.cartItems = [];
-      this.ventas = [];
+      this.pedidos = pedidos.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      this.cartItems = carrito;
+    } catch (error) {
+      this.mensaje = `No se pudo abrir el almacenamiento local: ${this.errorComoTexto(error)}`;
     }
   }
 
-  private guardarVenta(venta: Omit<VentaGuardada, 'id'>): void {
-    this.ventas = [
-      {
-        ...venta,
-        id: Date.now() + Math.floor(Math.random() * 1000)
-      },
-      ...this.ventas
-    ];
-    this.storageService.guardarVentas(this.ventas);
-  }
-
-  private obtenerStockDisponible(productoId: number): number {
-    const base = this.productosBase.find((producto) => producto.id === productoId);
-    if (!base) {
-      return 0;
+  private async guardarCarrito(): Promise<void> {
+    try {
+      await this.storageService.guardarCarrito(this.cartItems);
+    } catch (error) {
+      this.mensaje = `No se pudo guardar el carrito: ${this.errorComoTexto(error)}`;
     }
-
-    const reservados = this.cartItems
-      .filter((item) => item.productoId === productoId)
-      .reduce((total, item) => total + item.cantidad, 0);
-
-    return Math.max(0, base.stock - reservados);
   }
 
-  private actualizarStockDesdeCarrito(): void {
-    if (this.productosBase.length === 0) {
+  // Reintenta pedidos pendientes en orden; la clave idempotente evita duplicados en el backend.
+  private async sincronizarPedidos(): Promise<void> {
+    if (!this.enLinea || this.sincronizando) {
       return;
     }
+    this.sincronizando = true;
+    try {
+      const pendientes = await this.storageService.obtenerPedidosPendientes();
+      for (const pedido of pendientes) {
+        try {
+          const respuesta = await this.orderSyncService.enviar(pedido);
+          await this.storageService.actualizarPedido({
+            ...pedido,
+            estado: respuesta.estado,
+            idServidor: respuesta.id
+          });
+        } catch (error) {
+          await this.storageService.actualizarPedido({ ...pedido, ultimoError: this.errorComoTexto(error) });
+          this.mensaje = `El pedido sigue guardado y pendiente de sincronización: ${this.errorComoTexto(error)}`;
+        }
+      }
+      await this.cargarPersistencia();
+    } catch (error) {
+      this.mensaje = `No se pudo revisar la cola de pedidos: ${this.errorComoTexto(error)}`;
+    } finally {
+      this.sincronizando = false;
+    }
+  }
 
-    this.productos = this.productosBase.map((producto) => {
-      const itemEnCarrito = this.cartItems.find((item) => item.productoId === producto.id);
-      return {
-        ...producto,
-        stock: Math.max(0, producto.stock - (itemEnCarrito?.cantidad ?? 0))
-      };
-    });
+  // Polling de respaldo para reflejar cambios si no llega un evento push.
+  private async actualizarEstadosPedidos(): Promise<void> {
+    if (!this.enLinea) {
+      return;
+    }
+    try {
+      const pedidos = await this.storageService.obtenerPedidos();
+      for (const pedido of pedidos) {
+        if (!pedido.idServidor || !['recibido', 'preparacion'].includes(pedido.estado)) {
+          continue;
+        }
+        try {
+          const respuesta = await this.orderSyncService.consultarEstado(pedido.idServidor);
+          if (respuesta.estado !== pedido.estado) {
+            await this.storageService.actualizarPedido({ ...pedido, estado: respuesta.estado });
+            this.mensaje = `El pedido #${pedido.idServidor} ahora está: ${this.estadoLabel(respuesta.estado)}.`;
+          }
+        } catch (error) {
+          this.mensaje = `No se pudo actualizar el pedido #${pedido.idServidor}: ${this.errorComoTexto(error)}`;
+        }
+      }
+      await this.cargarPersistencia();
+    } catch (error) {
+      this.mensaje = `No se pudieron consultar los estados: ${this.errorComoTexto(error)}`;
+    }
+  }
+
+  // Aplica al pedido local los datos de estado asociados al push recibido.
+  private async aplicarActualizacionPush(payload: object): Promise<void> {
+    try {
+      const actualizacion = this.pushService.actualizacionDe(payload);
+      const pedido = this.pedidos.find((item) => item.idServidor === actualizacion.pedidoId);
+      if (pedido && actualizacion.estado) {
+        await this.storageService.actualizarPedido({ ...pedido, estado: actualizacion.estado });
+      }
+      await this.cargarPersistencia();
+    } catch (error) {
+      this.mensaje = `No se pudo guardar la actualización del pedido: ${this.errorComoTexto(error)}`;
+    }
+  }
+
+  // Traduce fallos de red/HTTP a mensajes útiles para la interfaz.
+  private errorComoTexto(error: unknown): string {
+    if (error instanceof HttpErrorResponse) {
+      return error.status === 0
+        ? 'No hay respuesta del servidor. Comprueba la conexión y la URL de la API.'
+        : `El servidor respondió con HTTP ${error.status}.`;
+    }
+    return error instanceof Error ? error.message : 'Error inesperado.';
   }
 }

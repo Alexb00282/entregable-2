@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#e3502e">
+  <title>Informe técnico | FastOrder PWA</title>
+  <style>
+    /* Variables de color y tipografía para el documento imprimible. */
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #332b24;
+      background: #f8f2ec;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      --accent: #e3502e;
+      --muted: #766a60;
+      --line: #eadfd5;
+      --paper: #fff;
+    }
+    /* Presentación del informe: ancho de lectura, encabezados, tablas y bloques de código. */
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { width: min(100% - 32px, 940px); margin: 30px auto; padding: clamp(22px, 5vw, 54px); background: var(--paper); box-shadow: 0 14px 50px #50311a14; }
+    header { padding: 10px 0 28px; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: #a75a3a; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+    h1 { max-width: 700px; margin: 14px 0; color: #332b24; font-size: clamp(36px, 7vw, 58px); line-height: 1; letter-spacing: -.04em; }
+    h2 { margin: 34px 0 12px; color: #472f22; font-size: 23px; }
+    h3 { margin: 22px 0 8px; font-size: 17px; }
+    p, li { color: #594e44; font-size: 14px; line-height: 1.7; }
+    .lead { max-width: 760px; font-size: 17px; }
+    .notice { margin: 20px 0; padding: 16px 18px; border-left: 4px solid var(--accent); background: #fff4ed; color: #684d3b; font-size: 13px; line-height: 1.65; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { padding: 17px; border: 1px solid var(--line); border-radius: 12px; background: #fffdfa; }
+    .card h3 { margin-top: 0; }
+    .card p { margin-bottom: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; font-size: 13px; line-height: 1.55; }
+    th { color: #72472f; }
+    code { padding: 2px 5px; border-radius: 4px; background: #f4eee8; color: #8d482d; font-family: Consolas, monospace; font-size: .91em; overflow-wrap: anywhere; }
+    pre { overflow-x: auto; padding: 16px; border-radius: 10px; background: #2d2925; color: #fff2e7; font-size: 12px; line-height: 1.55; }
+    pre code { padding: 0; background: transparent; color: inherit; }
+    ol, ul { padding-left: 22px; }
+    footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+    /* En pantallas angostas las tarjetas pasan a una columna. */
+    @media (max-width: 620px) {
+      main { width: 100%; margin: 0; padding: 24px 18px; }
+      .grid { grid-template-columns: 1fr; }
+      th, td { padding: 8px 6px; font-size: 11px; }
+    }
+    /* Al imprimir, elimina fondo y sombra y evita dividir tarjetas. */
+    @media print {
+      body { background: #fff; }
+      main { width: 100%; margin: 0; padding: 0; box-shadow: none; }
+      .card, .notice { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <!-- Portada y resumen del propósito y alcance del prototipo. -->
+  <header>
+    <p class="eyebrow">INFORME TÉCNICO · APLICACIONES WEB PROGRESIVAS</p>
+    <h1>FastOrder S.A.<br>Pedidos con Angular y PWA</h1>
+    <p class="lead">Propuesta e implementación académica mobile-first para consultar un menú, conservar un carrito sin conexión y coordinar la entrega con un backend mediante pedidos idempotentes.</p>
+  </header>
+
+  <section aria-labelledby="resumen">
+    <h2 id="resumen">Resumen ejecutivo</h2>
+    <p>FastOrder combina el app shell Angular con un menú de demostración, filtros por categoría, carrito persistente en IndexedDB y una cola local de pedidos. La experiencia distingue una orden guardada en el dispositivo de una orden aceptada por el restaurante. Cuando la conexión vuelve o el usuario abre de nuevo la aplicación, la cola intenta sincronizarse con el servidor.</p>
+    <div class="notice"><strong>Límite del prototipo:</strong> este repositorio contiene el frontend; no incorpora API, base de datos de pedidos ni emisor Web Push. El menú y sus precios son datos de muestra. La aceptación, inventario, idempotencia y estados reales requieren el backend documentado en README.md.</div>
+  </section>
+
+  <!-- Componentes principales y razón de cada estrategia de caché. -->
+  <section aria-labelledby="arquitectura">
+    <h2 id="arquitectura">Arquitectura y comportamiento offline</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>App shell y menú</h3>
+        <p>Angular Service Worker precarga la aplicación. El servicio del menú emite primero la copia IndexedDB y vuelve a consultar <code>/data/catalogo.json</code>; la respuesta nueva sustituye la copia local. Es SWR en la capa de servicio, combinado con <code>freshness</code> del NGSW.</p>
+      </article>
+      <article class="card">
+        <h3>Carrito y sincronización</h3>
+        <p>El carrito y cada pedido se escriben en IndexedDB. El UUID permanece estable como <code>Idempotency-Key</code>. La app intenta enviar al iniciar o al recibir el evento <code>online</code>; los fallos dejan el pedido pendiente y visibles para el usuario.</p>
+      </article>
+      <article class="card">
+        <h3>Estado del pedido</h3>
+        <p>La API es la autoridad. La app consulta el estado cada 15 segundos mientras está abierta y procesa push entrantes. El rastreador presenta Recibido, En preparación y Listo.</p>
+      </article>
+      <article class="card">
+        <h3>Instalación y manifest</h3>
+        <p>El banner responde a <code>beforeinstallprompt</code>. El manifest define nombre, rutas, modo standalone, colores gastronómicos e iconos SVG genérico y maskable.</p>
+      </article>
+    </div>
+    <h3>Políticas del Service Worker</h3>
+    <table>
+      <thead><tr><th>Recurso</th><th>Política</th><th>Motivo</th></tr></thead>
+      <tbody>
+        <tr><td>Menú GET</td><td><code>freshness</code>, timeout 3 s, máximo 30 días; menú IndexedDB emitido primero.</td><td>Contenido consultable sin conexión y actualizado al recuperar red.</td></tr>
+        <tr><td>Lectura de pedidos GET</td><td><code>freshness</code>, timeout 3 s, retención máxima 5 minutos.</td><td>Prioriza estado actual y limita el respaldo potencialmente obsoleto.</td></tr>
+        <tr><td>Crear pedido POST</td><td>IndexedDB + reintento explícito con UUID.</td><td>NGSW no encola POST. La confirmación debe venir del servidor.</td></tr>
+      </tbody>
+    </table>
+    <div class="notice"><strong>Precisión técnica:</strong> Angular NGSW configura <code>performance</code> o <code>freshness</code>, no una política nativa llamada stale-while-revalidate. FastOrder produce el comportamiento SWR del menú en <code>CatalogoService</code> con IndexedDB y revalidación HTTP.</div>
+  </section>
+
+  <!-- Contrato ilustrativo de la cola offline con la API del restaurante. -->
+  <section aria-labelledby="sincronizacion">
+    <h2 id="sincronizacion">Sincronización de pedidos</h2>
+    <p>El frontend guarda primero cada pedido en una transacción local; si está online, intenta sincronizarlo inmediatamente. Al reconectar, el evento de red dispara otro intento. Si el navegador cierra la pestaña, el pedido permanece local y se reintenta al abrir la PWA; este proyecto no promete ejecución de background sync con la app cerrada.</p>
+    <p>El servidor debe hacer la clave idempotente efectiva y recalcular precios/disponibilidad. La cabecera impide duplicados solo si la API persiste y aplica la clave de forma atómica.</p>
+    <pre><code>POST /api/orders
+Idempotency-Key: UUID
+{
+  "clientOrderId": "UUID",
+  "items": [{ "productoId": 1, "nombre": "Hamburguesa clásica",
+              "cantidad": 2, "precio": 18.9 }],
+  "total": 37.8,
+  "createdAt": "2026-10-16T15:00:00.000Z"
+}
+// Respuesta: { "id": "orden-servidor-123", "estado": "recibido" }</code></pre>
+  </section>
+
+  <!-- Pasos operativos para configurar y probar Web Push real. -->
+  <section aria-labelledby="push">
+    <h2 id="push">Notificaciones push: configuración y simulación</h2>
+    <ol>
+      <li>Crear claves VAPID en el backend. Publicar solo la clave pública en la etiqueta meta <code>vapid-public-key</code>; la privada permanece como secreto del servidor.</li>
+      <li>Desplegar sobre HTTPS y usar un build de producción para activar Angular Service Worker.</li>
+      <li>Solicitar permiso desde la interacción del usuario; <code>SwPush.requestSubscription</code> registra la suscripción en <code>POST /api/push/subscribe</code>.</li>
+      <li>Cuando cambie el pedido, enviar un Web Push firmado con título/cuerpo y <code>data.orderId</code> y <code>data.status</code>.</li>
+      <li>Probar el mismo payload desde el backend de desarrollo; comprobar notificación, mensaje y paso del rastreador. Una notificación local del navegador no prueba transporte push.</li>
+    </ol>
+    <pre><code>{
+  "notification": { "title": "FastOrder", "body": "Tu pedido está en preparación." },
+  "data": { "orderId": "orden-servidor-123", "status": "preparacion" }
+}</code></pre>
+  </section>
+
+  <!-- Respuestas académicas sobre PWA, caché, responsive y modo offline. -->
+  <section aria-labelledby="preguntas">
+    <h2 id="preguntas">Respuestas a preguntas guía</h2>
+    <h3>¿Qué ventajas aporta una PWA frente a una app nativa?</h3>
+    <p>Una PWA puede instalarse desde el navegador, compartirse mediante URL y actualizarse desde la web, reduciendo la fricción de distribución y permitiendo reutilizar tecnologías entre plataformas. Service Worker y almacenamiento local habilitan una experiencia tolerante a interrupciones de red. No todas las APIs, permisos ni políticas de instalación están disponibles por igual en cada navegador; una app nativa puede ofrecer integración más amplia y consistente con el sistema operativo.</p>
+    <h3>¿Por qué se seleccionan estrategias de caché diferentes?</h3>
+    <p>El menú permite mostrar contenido guardado y revalidarlo, mientras el estado de un pedido prioriza la respuesta de red por su naturaleza cambiante. El envío POST no se simula mediante caché: se guarda como operación pendiente hasta obtener confirmación. La fuente de verdad de precio, stock y estado siempre debe ser el backend.</p>
+    <h3>¿Cómo se realiza el diseño responsivo?</h3>
+    <p>Se parte de pantallas estrechas, controles táctiles y una jerarquía de lectura corta. CSS Grid adapta las tarjetas, Flexbox organiza encabezados y el carrito lateral se convierte en panel a pantalla completa en móviles. Las categorías son desplazables, el buscador filtra en el momento y los estados se acompañan con etiquetas, color y texto. Debe validarse con teclado, lectores de pantalla, zoom y dispositivos físicos.</p>
+    <h3>¿Cómo se administra el modo offline?</h3>
+    <p>El Service Worker conserva el app shell y las peticiones GET definidas; IndexedDB persiste menú, carrito y pedidos pendientes. La aplicación reintenta al reconectar o al iniciar. Una clave estable permite al backend deduplicar el reenvío. El usuario ve claramente “pendiente” hasta que el servidor confirma. El evento online no equivale a Background Sync: requiere que la aplicación vuelva a estar activa.</p>
+  </section>
+
+  <!-- Comandos y archivos para reproducir la validación técnica. -->
+  <section aria-labelledby="validacion">
+    <h2 id="validacion">Validación y ejecución</h2>
+    <p>Ejecutar <code>npm test -- --watch=false --browsers=ChromeHeadless</code> y <code>npm run build</code>. Para revisar offline, servir <code>dist/villa001/browser</code> en localhost o HTTPS, abrir online una vez, revisar el worker y Cache Storage, activar modo offline y recargar. Comprobar también que un pedido no figure como recibido antes de una respuesta válida del backend.</p>
+    <p>El código principal está organizado en <code>src/app/app.component.*</code> para la experiencia, <code>storage.service.ts</code> para IndexedDB, <code>catalogo.service.ts</code> para menú/SWR, <code>order-sync.service.ts</code> para la API, <code>push.service.ts</code> para Web Push y <code>ngsw-config.json</code> para caché.</p>
+  </section>
+  <footer>FastOrder S.A. · Informe académico de Angular 19, PWA, experiencia offline y pedidos.</footer>
+</main>
+</body>
+</html>

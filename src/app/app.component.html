@@ -1,329 +1,190 @@
 <div class="app-shell">
+  <!-- Encabezado fijo: identidad, conexión y acceso a instalación cuando esté disponible. -->
   <header class="site-header">
-    <a class="brand" href="/" aria-label="Backus Ventas, inicio">
-      <span class="brand-symbol" aria-hidden="true">BV</span>
-      <span>Backus <strong>Ventas</strong></span>
+    <a class="brand" href="/" aria-label="FastOrder, inicio">
+      <span class="brand-symbol" aria-hidden="true">F</span>
+      <span>Fast<strong>Order</strong></span>
     </a>
-
     <div class="header-tools">
       <span class="network-state" [class.is-offline]="!enLinea" role="status">
-        <span class="network-dot"></span>
-        {{ enLinea ? 'Conectado' : 'Sin conexión' }}
+        <span class="network-dot"></span>{{ enLinea ? 'En línea' : 'Modo sin conexión' }}
       </span>
-      <button class="icon-action" type="button" (click)="recargar()" [disabled]="cargandoCatalogo" aria-label="Actualizar catálogo y precios" title="Actualizar catálogo y precios">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3M4 4v4h4M4 13a8 8 0 0 0 14.9 3M20 20v-4h-4" /></svg>
-      </button>
+      @if (instalable) {
+        <button class="install-button" type="button" (click)="instalarApp()">Instalar app</button>
+      }
     </div>
   </header>
 
+  <!-- Contenido principal: bienvenida, catálogo y estado de pedidos. -->
   <main class="page-content">
     <section class="hero" aria-labelledby="page-title">
       <div class="hero-copy">
-        <p class="eyebrow">CASO ACADÉMICO · DATOS FICTICIOS</p>
-        <h1 id="page-title">Catálogo de ventas</h1>
-        <p>El portafolio para tu próxima visita, incluso con cobertura irregular.</p>
-        <div class="hero-actions">
-          <button type="button" class="primary-button" (click)="recargar()">Actualizar catálogo</button>
-          <span class="hero-caption">Disponible online y offline</span>
-        </div>
+        <p class="eyebrow">RESTAURANTE · PEDIDOS FÁCILES</p>
+        <h1 id="page-title">Tu antojo,<br>listo en minutos.</h1>
+        <p>Explora el menú, arma tu pedido y sigue cada paso desde tu teléfono.</p>
       </div>
-      <div class="hero-stamp" aria-hidden="true">
-        <span>VENTAS</span>
-        <strong>EN CAMPO</strong>
-      </div>
+      <div class="hero-art" aria-hidden="true">🍔</div>
     </section>
 
-    <section class="stats-bar" aria-label="Indicadores de la operación">
-      <article class="stat-card">
-        <span>Productos</span>
-        <strong>{{ productos.length }}</strong>
-      </article>
-      <article class="stat-card">
-        <span>Stock total</span>
-        <strong>{{ stockTotal }} uds.</strong>
-      </article>
-      <article class="stat-card">
-        <span>Estado</span>
-        <strong>{{ enLinea ? 'Operativo' : 'Offline' }}</strong>
-      </article>
-    </section>
-
-    <section class="catalog" aria-labelledby="catalog-heading">
-      <div class="catalog-heading">
+    <!-- Menú filtrable por texto y categoría; productos provienen del servicio de catálogo. -->
+    <section class="menu-section" aria-labelledby="menu-title">
+      <div class="section-heading">
         <div>
-          <p class="eyebrow eyebrow--dark">PORTAFOLIO</p>
-          <h2 id="catalog-heading">Productos</h2>
+          <p class="eyebrow eyebrow--dark">RECIÉN HECHO PARA TI</p>
+          <h2 id="menu-title">Nuestro menú</h2>
         </div>
-        <span class="result-count">{{ productosFiltrados.length }} productos</span>
+        <span class="result-count">{{ productosFiltrados.length }} opciones</span>
       </div>
-
-      <article class="product-manager" aria-label="Agregar y quitar productos">
-        <div class="manager-header">
-          <p class="eyebrow eyebrow--dark">GESTIÓN</p>
-          <h3>Agregar producto</h3>
-        </div>
-
-        <div class="manager-grid">
-          <label class="field">
-            <span>Nombre</span>
-            <input type="text" [(ngModel)]="nuevoProducto.nombre" placeholder="Ej. Cristal 1L" />
-          </label>
-
-          <label class="field">
-            <span>Categoría</span>
-            <input type="text" [(ngModel)]="nuevoProducto.categoria" placeholder="Ej. Cerveza" />
-          </label>
-
-          <label class="field">
-            <span>Precio (S/)</span>
-            <input type="number" min="0" step="0.01" [(ngModel)]="nuevoProducto.precio" />
-          </label>
-
-          <label class="field">
-            <span>Stock</span>
-            <input type="number" min="0" step="1" [(ngModel)]="nuevoProducto.stock" />
-          </label>
-        </div>
-
-        <div class="panel-actions">
-          <button type="button" class="primary-button" (click)="agregarProducto()">Agregar al catálogo</button>
-        </div>
-      </article>
 
       <label class="search-field">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></svg>
-        <input type="search" placeholder="Buscar producto o categoría" [value]="terminoBusqueda" (input)="actualizarBusqueda($event)" aria-label="Buscar producto o categoría">
+        <input type="search" placeholder="¿Qué se te antoja?" [(ngModel)]="terminoBusqueda" aria-label="Buscar en el menú">
       </label>
 
-      <section class="cart-summary" aria-label="Resumen del carrito">
-        <div>
-          <p class="eyebrow eyebrow--dark">CARRITO</p>
-          <h3>{{ cartItems.length }} artículo(s)</h3>
-        </div>
-        <strong>S/ {{ totalCarrito | number:'1.2-2' }}</strong>
-      </section>
+      <!-- Cada pestaña actualiza el filtro sin volver a consultar el servidor. -->
+      <nav class="category-tabs" aria-label="Categorías del menú">
+        @for (categoria of categorias; track categoria) {
+          <button type="button" class="category-tab" [class.is-selected]="categoriaSeleccionada === categoria"
+            [attr.aria-pressed]="categoriaSeleccionada === categoria" (click)="seleccionarCategoria(categoria)">
+            {{ categoria }}
+          </button>
+        }
+      </nav>
 
-      @if (cargandoCatalogo) {
-        <div class="empty-state" role="status">Cargando catálogo…</div>
+      <!-- Estados mutuamente excluyentes de carga, error, búsqueda vacía y resultados. -->
+      @if (cargandoCatalogo && productos.length === 0) {
+        <div class="empty-state" role="status">Cargando el menú…</div>
       } @else if (errorCatalogo && productos.length === 0) {
         <div class="empty-state empty-state--error" role="alert">
-          <strong>No se pudo cargar el catálogo.</strong>
-          <span>Conéctate y vuelve a intentarlo para guardar los datos para uso offline.</span>
-          <button type="button" class="retry-button" (click)="recargar()">Intentar de nuevo</button>
+          <strong>No se pudo cargar el menú.</strong>
+          <span>{{ errorCatalogo }} Si ya habías visitado la app, prueba recargar con conexión.</span>
         </div>
       } @else if (productosFiltrados.length === 0) {
-        <div class="empty-state">No encontramos productos para esa búsqueda.</div>
+        <div class="empty-state">No encontramos platos con esa búsqueda.</div>
       } @else {
-        <div class="product-list">
+        <!-- Tarjeta individual: detalles del plato y acción para añadir al carrito. -->
+        <div class="product-grid">
           @for (producto of productosFiltrados; track producto.id) {
-            <article class="product-row">
-              <div class="product-info">
-                <div class="product-visual" [attr.data-product-id]="producto.id" aria-hidden="true"><span>{{ producto.nombre.charAt(0) }}</span></div>
-                <div class="product-title">
-                  <span class="product-category">{{ producto.categoria }}</span>
-                  <h3>{{ producto.nombre }}</h3>
-                  <span class="product-id">SKU {{ producto.id.toString().padStart(4, '0') }}</span>
+            <article class="product-card">
+              <div class="product-emoji" aria-hidden="true">{{ producto.emoji }}</div>
+              <div class="product-details">
+                <span class="product-category">{{ producto.categoria }}</span>
+                <h3>{{ producto.nombre }}</h3>
+                <p>{{ producto.descripcion }}</p>
+                <div class="product-footer">
+                  <strong>S/ {{ producto.precio | number:'1.2-2' }}</strong>
+                  <button class="add-button" type="button" (click)="agregarAlCarrito(producto)"
+                    [attr.aria-label]="'Agregar ' + producto.nombre + ' al carrito'">+</button>
                 </div>
-              </div>
-
-              <div class="product-facts">
-                <div class="fact">
-                  <span>Precio unitario</span>
-                  <strong>S/ {{ obtenerPrecio(producto).precio | number:'1.2-2' }}</strong>
-                </div>
-                <div class="fact">
-                  <span>Stock disponible</span>
-                  <strong>{{ obtenerPrecio(producto).stock }} <small>unid.</small></strong>
-                </div>
-                <button type="button" class="secondary-button" (click)="agregarAlCarrito(producto.id)">Agregar</button>
-                <button type="button" class="remove-button" (click)="quitarProducto(producto.id)" [attr.aria-label]="'Quitar producto ' + producto.nombre">
-                  Quitar
-                </button>
               </div>
             </article>
           }
         </div>
       }
-
-      <div class="sales-workspace">
-        <section class="cart-panel" aria-label="Carrito del vendedor">
-          <div class="panel-header cart-header">
-            <div>
-              <p class="eyebrow eyebrow--dark">CARRITO</p>
-              <h3>Productos reservados</h3>
-            </div>
-            <span class="result-count">{{ cartItems.length }} en lista</span>
-          </div>
-
-          @if (cartItems.length === 0) {
-            <div class="empty-state">Tu carrito está vacío. Agrega productos para reservar stock.</div>
-          } @else {
-            <div class="cart-list">
-              @for (item of cartItems; track item.productoId) {
-                <div class="cart-item">
-                  <div>
-                    <strong>{{ item.nombre }}</strong>
-                    <span>{{ item.categoria }} · {{ item.cantidad }} und.</span>
-                  </div>
-                  <div class="cart-item-actions">
-                    <span>S/ {{ (item.precio * item.cantidad) | number:'1.2-2' }}</span>
-                    <button type="button" class="secondary-button compact" (click)="quitarDelCarrito(item.productoId)" [attr.aria-label]="'Quitar una unidad de ' + item.nombre">-</button>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-
-          <div class="cart-footer">
-            <strong>Total del carrito: S/ {{ totalCarrito | number:'1.2-2' }}</strong>
-            <button type="button" class="primary-button" (click)="confirmarCompra()" [disabled]="cartItems.length === 0">
-              Confirmar compra
-            </button>
-          </div>
-        </section>
-
-        <section class="sales-panel" aria-label="Historial de ventas">
-          <div class="panel-header cart-header">
-            <div>
-              <p class="eyebrow eyebrow--dark">VENTAS</p>
-              <h3>Historial</h3>
-            </div>
-            <span class="result-count">{{ ventas.length }} ventas</span>
-          </div>
-
-          @if (ventas.length === 0) {
-            <div class="empty-state">Todavía no hay ventas confirmadas.</div>
-          } @else {
-            <div class="sales-list">
-              @for (venta of ventas; track venta.id) {
-                <div class="sale-item">
-                  <div>
-                    <strong>{{ venta.nombre }}</strong>
-                    <span>{{ venta.cantidad }} und. · {{ venta.fecha | date:'dd/MM/yyyy HH:mm' }}</span>
-                  </div>
-                  <span class="sale-total">S/ {{ venta.total | number:'1.2-2' }}</span>
-                </div>
-              }
-            </div>
-          }
-
-          <div class="sales-total">
-            <span>Total vendido</span>
-            <strong>S/ {{ totalVentas | number:'1.2-2' }}</strong>
-          </div>
-        </section>
-      </div>
-
-      <footer class="data-note">
-        <span class="note-icon" aria-hidden="true">i</span>
-        <p>
-          @if (errorPrecios) {
-            No se pudieron actualizar precios y stock. Se muestran valores previamente disponibles.
-          } @else if (precios.length > 0) {
-            Precios y stock consultados por separado. Última actualización: {{ precios[0].actualizado | date:'dd/MM/yyyy, HH:mm' }}.
-          } @else {
-            Precios y stock se consultan por separado para priorizar información reciente.
-          }
-        </p>
-        <span class="academic-label">EJEMPLO ILUSTRATIVO</span>
-      </footer>
     </section>
 
-    <section class="operations" aria-label="Operaciones de ventas y gestión offline">
-      <article class="panel">
-        <div class="panel-header">
-          <p class="eyebrow eyebrow--dark">MENSAJE DEL VENDEDOR</p>
-          <h3>Registrar mensaje</h3>
+    <!-- Seguimiento: pendientes locales o progreso confirmado por la API. -->
+    <section class="orders-section" aria-labelledby="orders-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow eyebrow--dark">ACTUALIZACIONES</p>
+          <h2 id="orders-title">Sigue tus pedidos</h2>
         </div>
+        @if (sincronizando) { <span class="sync-state">Sincronizando…</span> }
+      </div>
 
-        <label class="field">
-          <span>Mensaje</span>
-          <textarea [(ngModel)]="mensaje" rows="4" placeholder="Ej. Requiere entrega urgente en Trujillo..."></textarea>
-        </label>
-
-        <div class="panel-actions">
-          <button type="button" class="primary-button" (click)="guardarMensaje()" [disabled]="!mensaje.trim()">
-            {{ enLinea ? 'Enviar mensaje' : 'Guardar localmente' }}
-          </button>
-        </div>
-
-        @if (mensajeGuardado) {
-          <p class="status-message" role="status">{{ mensajeGuardado }}</p>
-        }
-
-        @if (mensajesPendientes.length > 0) {
-          <div class="list-box">
-            <h4>Mensajes pendientes</h4>
-            <ul>
-              @for (item of mensajesPendientes; track item.id) {
-                <li>
-                  <span>{{ item.texto }}</span>
-                  <small>{{ item.fecha | date:'dd/MM/yyyy HH:mm' }}</small>
-                </li>
+      @if (pedidos.length === 0) {
+        <div class="empty-state">Tus pedidos aparecerán aquí después de confirmar tu carrito.</div>
+      } @else {
+        <div class="order-list">
+          @for (pedido of pedidos; track pedido.id) {
+            <article class="order-card">
+              <div class="order-heading">
+                <div>
+                  <span class="order-date">{{ pedido.fecha | date:'dd/MM/yyyy · HH:mm' }}</span>
+                  <h3>Pedido {{ pedido.idServidor ? '#' + pedido.idServidor : 'pendiente' }}</h3>
+                </div>
+                <strong>S/ {{ pedido.total | number:'1.2-2' }}</strong>
+              </div>
+              <ul class="order-items">
+                @for (item of pedido.items; track item.productoId) {
+                  <li>{{ item.cantidad }} × {{ item.nombre }}</li>
+                }
+              </ul>
+              <!-- El pedido solo se dibuja como recibido si existe confirmación del servidor. -->
+              @if (pedido.estado === 'pendiente') {
+                <div class="pending-order" role="status">
+                  <span class="pending-dot"></span>
+                  Guardado en este dispositivo; pendiente de enviar.
+                  @if (pedido.ultimoError) { <span>{{ pedido.ultimoError }}</span> }
+                </div>
+              } @else {
+                <ol class="order-tracker" aria-label="Estado del pedido">
+                  @for (paso of pasosPedido; track paso.estado; let index = $index) {
+                    <li [class.is-done]="pasoActivo(pedido.estado, paso.estado)" [class.is-current]="pedido.estado === paso.estado">
+                      <span class="step-marker">{{ pasoActivo(pedido.estado, paso.estado) ? '✓' : index + 1 }}</span>
+                      <span>{{ paso.etiqueta }}</span>
+                    </li>
+                  }
+                </ol>
               }
-            </ul>
-          </div>
-        }
-      </article>
-
-      <article class="panel">
-        <div class="panel-header">
-          <p class="eyebrow eyebrow--dark">PEDIDO</p>
-          <h3>Registrar pedido</h3>
+              <span class="order-status">{{ estadoLabel(pedido.estado) }}</span>
+            </article>
+          }
         </div>
-
-        <div class="order-grid">
-          <label class="field">
-            <span>Producto</span>
-            <select [(ngModel)]="productoPedido">
-              @for (producto of productos; track producto.id) {
-                <option [ngValue]="producto.id">{{ producto.nombre }}</option>
-              }
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Cantidad</span>
-            <input type="number" min="1" [max]="stockDisponiblePedido" [ngModel]="cantidadPedido" (ngModelChange)="validarCantidadPedido($event)" />
-          </label>
-        </div>
-
-        @if (productoSeleccionado) {
-          <p class="stock-info">Stock disponible: {{ stockDisponiblePedido }} unidades.</p>
-        }
-
-        <label class="field">
-          <span>Observaciones</span>
-          <textarea [(ngModel)]="observacionPedido" rows="3" placeholder="Ej. Entrega en horario de 9:00 a 12:00"></textarea>
-        </label>
-
-        <div class="panel-actions">
-          <button type="button" class="primary-button" (click)="guardarPedido()" [disabled]="productos.length === 0 || cantidadPedido < 1 || cantidadPedido > stockDisponiblePedido">
-            {{ enLinea ? 'Procesar pedido' : 'Guardar pedido offline' }}
-          </button>
-        </div>
-
-        @if (pedidosPendientes.length > 0) {
-          <div class="list-box">
-            <h4>Pedidos pendientes</h4>
-            <ul>
-              @for (pedido of pedidosPendientes; track pedido.id) {
-                <li>
-                  <div>
-                    <strong>{{ pedido.producto }}</strong>
-                    <span>{{ pedido.cantidad }} und. · S/ {{ pedido.total | number:'1.2-2' }}</span>
-                  </div>
-                  <small>{{ pedido.fecha | date:'dd/MM/yyyy HH:mm' }}</small>
-                </li>
-              }
-            </ul>
-          </div>
-        }
-      </article>
+      }
     </section>
   </main>
 
-  <div class="offline-notice" [class.offline-notice--show]="!enLinea" role="status" aria-live="polite">
-    Sin conexión. El catálogo previamente consultado seguirá disponible.
-  </div>
+  <!-- Mensajes transitorios para confirmar acciones o explicar errores. -->
+  @if (mensaje) {
+    <div class="toast" role="status" aria-live="polite">
+      <span>{{ mensaje }}</span><button type="button" (click)="mensaje = ''" aria-label="Cerrar aviso">×</button>
+    </div>
+  }
+
+  <!-- Botón persistente del carrito y drawer que se abre desde abajo/en el lateral visual. -->
+  <button class="cart-fab" type="button" (click)="cartOpen = !cartOpen" [attr.aria-expanded]="cartOpen"
+    aria-controls="cart-panel" aria-label="Abrir carrito">
+    <span aria-hidden="true">🛒</span><span>Mi pedido</span><strong>{{ unidadesCarrito }}</strong>
+  </button>
+
+  @if (cartOpen) {
+    <div class="drawer-backdrop" (click)="cartOpen = false" (keydown.escape)="cartOpen = false">
+      <aside id="cart-panel" class="cart-drawer" aria-label="Tu pedido" (click)="$event.stopPropagation()">
+        <div class="drawer-heading">
+          <div><p class="eyebrow eyebrow--dark">TU SELECCIÓN</p><h2>Mi pedido</h2></div>
+          <button class="close-button" type="button" (click)="cartOpen = false" aria-label="Cerrar carrito">×</button>
+        </div>
+        @if (cartItems.length === 0) {
+          <div class="empty-state">Tu carrito está vacío. Agrega algo rico del menú.</div>
+        } @else {
+          <div class="cart-items">
+            @for (item of cartItems; track item.productoId) {
+              <div class="cart-item">
+                <div><strong>{{ item.nombre }}</strong><span>S/ {{ (item.precio * item.cantidad) | number:'1.2-2' }}</span></div>
+                <div class="quantity-control">
+                  <button type="button" (click)="cambiarCantidad(item.productoId, -1)" [attr.aria-label]="'Quitar una unidad de ' + item.nombre">−</button>
+                  <span>{{ item.cantidad }}</span>
+                  <button type="button" (click)="cambiarCantidad(item.productoId, 1)" [attr.aria-label]="'Agregar una unidad de ' + item.nombre">+</button>
+                </div>
+              </div>
+            }
+          </div>
+          <div class="drawer-footer">
+            <div class="subtotal"><span>Total</span><strong>S/ {{ totalCarrito | number:'1.2-2' }}</strong></div>
+            <button class="checkout-button" type="button" (click)="confirmarPedido()">Confirmar pedido</button>
+            <small>Si no hay conexión, lo guardaremos aquí para enviarlo después.</small>
+          </div>
+        }
+      </aside>
+    </div>
+  }
+
+  <!-- El navegador muestra la opción push únicamente cuando el Service Worker está activo. -->
+  @if (pushDisponible) {
+    <button class="push-button" type="button" (click)="activarAvisos()" [disabled]="activandoAvisos">
+      {{ activandoAvisos ? 'Activando…' : 'Activar avisos de pedidos' }}
+    </button>
+  }
 </div>

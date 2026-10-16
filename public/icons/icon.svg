@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#073f83"/>
-  <path d="M115 149h282v52H178v55h188v52H178v55h219v52H115z" fill="#fff"/>
-  <path d="M115 97h282v36H115z" fill="#64b5a2"/>
+  <!-- Icono cuadrado con plato estilizado; el navegador puede recortar sus esquinas. -->
+  <rect width="512" height="512" rx="112" fill="#e3502e"/>
+  <path d="M132 231h248v36H132zm24-55h200c-10-42-48-72-100-72s-90 30-100 72zm-24 111h248c-10 42-48 72-100 72h-48c-52 0-90-30-100-72z" fill="#fffaf5"/>
+  <path d="M151 293h210" fill="none" stroke="#ffca68" stroke-linecap="round" stroke-width="15"/>
 </svg>
